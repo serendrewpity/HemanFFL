@@ -5,7 +5,7 @@
 Function Create-Form () {
 	[CmdletBinding()]
 	param (	[int] $height,	[int] $width, [string] $name, [string] $text )
-	
+
 	$frm					= New-Object system.Windows.Forms.Form
 	$sze					= New-Object System.Drawing.Size($width,$height)
 
@@ -35,7 +35,7 @@ Function Create-Groupbox () {
 }
 Function Create-Panel () {
 	[CmdletBinding()]
-	param (	[int] $height,	[int] $width,	[int] $top,	[int] $left,	
+	param (	[int] $height,	[int] $width,	[int] $top,	[int] $left,
 		[string] $name,	[string] $text	)
 
 	$pnl					= New-Object system.Windows.Forms.Panel
@@ -52,13 +52,13 @@ Function Create-Panel () {
 }
 Function Create-Label () {
 	[CmdletBinding()]
-	param (	[int] $height,	[int] $width,	[int] $top,	[int] $left,	
+	param (	[int] $height,	[int] $width,	[int] $top,	[int] $left,
 		[string] $name, [string] $text )
 
 	$lbl					= New-Object System.Windows.Forms.Label
 	$sze					= New-Object System.Drawing.Size($width,$height)
 	$pnt					= New-Object system.drawing.point($left,$top)
-	
+
 	$lbl.AutoSize			= $false
     $lbl.name				= $name
     $lbl.text				= $text
@@ -71,12 +71,13 @@ Function Create-Label () {
 }
 Function Create-Button () {
 	[CmdletBinding()]
-	param (	[int] $height,	[int] $width,	[int] $top,	[int] $left,	
-		[string] $text	)
+	param (	[int] $height,	[int] $width,	[int] $top,	[int] $left,
+		[string] $name, [string] $text	)
 
     $btn			= New-Object System.Windows.Forms.Button
 	$pnt			= New-Object system.drawing.point($left,$top)
-	
+
+    $btn.Name		= $name
     $btn.Text		= $text
     $btn.Width		= $width
     $btn.Height		= $height

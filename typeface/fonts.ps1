@@ -1,5 +1,5 @@
-$MsansXsmall			= New-Object System.Drawing.Font("Microsoft Sans Serif",8)
-$MsansXsmallBold		= New-Object System.Drawing.Font("Microsoft Sans Serif",8,[System.Drawing.FontStyle]::Bold)
+$MsansXsmall			= New-Object System.Drawing.Font("Microsoft Sans Serif",7.5)
+$MsansXsmallBold		= New-Object System.Drawing.Font("Microsoft Sans Serif",7.5,[System.Drawing.FontStyle]::Bold)
 $MsansSmall				= New-Object System.Drawing.Font("Microsoft Sans Serif",10)
 $MsansSmallBoldItalic	= New-Object System.Drawing.Font("Microsoft Sans Serif",10,[System.Drawing.FontStyle]([System.Drawing.FontStyle]::Bold -bor [System.Drawing.FontStyle]::Italic))
 $MsansSmallBold			= New-Object System.Drawing.Font("Microsoft Sans Serif",10,[System.Drawing.FontStyle]::Bold)

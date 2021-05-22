@@ -35,6 +35,12 @@ Function Select-MenuItem () {
 	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
 	$brdr = $menuitem.parent
 
+	$form=$brdr.parent.parent.parent.parent.parent
+	$form.controls.Find("ListName",$true)[0].Text = $menuitem.Text	
+	$form.controls.Find("cardscroller",$true)[0].controls | Where {$_.BackColor -eq $highlight} | ForEach-Object -Process {
+		$_.BackColor = $buttonface
+	}
+
 	if ($brdr.width -eq $menuitem.width) {
 		Deselect-MenuItems -menuitem $menuitem
 		$brdr.BackColor = $highlight
@@ -45,8 +51,10 @@ Function Select-MenuItem () {
 		$menuitem.Width = $brdr.width-6
 	}
 	$brdr = $null
+	$form=$null
 	$highlight = $null
 	$buttonface = $null
+	$menuitem = $null
 }
 Function Deselect-MenuItems () {
 	[CmdletBinding()]
@@ -113,11 +121,12 @@ Function Get-PlayerCards () {
 	} elseif ($filter -in $olist) {
 		$data = $($global:dataset | Where-Object -Property Owner -eq $filter)
 	} elseif ($filter -in $rlist) {
-		$data = $($global:dataset | Where-Object -Property Round -eq $($hash[$filter]))
+		$data = $( $global:dataset | Where-Object {(($_.Round -eq $($hash[$filter])) -and ($_.Selected -eq $true))} | 
+				Sort-Object -Property Pick)
 	} elseif ($filter -in $plist ) {
 		$data = $($global:dataset | Where-Object -Property Position -eq $($hash[$filter]))
 	} elseif ($filter -eq "Available Players") {
-		$data = $($global:dataset | Where-Object -not Selected)
+		$data = $($global:dataset | Where-Object -Property Selected -ne $true)
 	} else {
 		$data = $global:dataset
 	}
@@ -150,6 +159,8 @@ Function Update-Players () {
 	
 	$scroller = $null
 	$tmpcollection = $null
+	$filteredplayers = $null
+	$panel = $null
 }
 Function Set-Drawers () {
 	[CmdletBinding()]
@@ -169,7 +180,7 @@ Function Set-Drawers () {
 	1..$list.Length | ForEach-Object -Process {
 		$border=Create-Label -height 27 -width 183 -top 0 -left 0 -name ("Item_"+[string]$_) -text $($list[($_-1)])
 		$border.BorderStyle = "Fixed3D"
-		$container=Create-Label -height 27 -width 183 -top 0 -left 0 -name ("Item_"+[string]$_) -text $($list[($_-1)])
+		$container=Create-Label -height 27 -width 183 -top 0 -left 0 -name ("$($list[($_-1)])") -text $($list[($_-1)])
 		$container.margin=New-Object System.Windows.Forms.Padding(0, 0, 0, 0)
 		$container.padding=New-Object System.Windows.Forms.Padding(0, 0, 0, 0)
 		$container.TextAlign="MiddleLeft"
@@ -178,11 +189,17 @@ Function Set-Drawers () {
 			$form = $this.parent.parent.parent.parent.parent.parent
 			$right = $form.controls.Find("RightPanel",$true)[0]
 			$togglebx = $form.controls.Find("togglebx",$true)[0]
-
+			$draftbtn = $form.controls.Find("DraftBtn",$true)[0]
+			$draftbtn.enabled=$false
+			
 			Select-MenuItem -menuitem $this
 			Update-Players -panel $right -filter $this.text
 			Update-PositionCounts -element $togglebx
 
+			$draftbtn = $null
+			$togglebx = $null
+			$right = $null
+			$form = $null
 		})
 		$border.controls.add($container)
 		$sclr.controls.add($border)
@@ -194,7 +211,7 @@ Function Set-Drawers () {
 	$plist = $null
 	$olist = $null
 	$rlist = $null
-	
+	$parent = $null
 }
 Function Create-Handle () {
 	[CmdletBinding()]
@@ -202,7 +219,7 @@ Function Create-Handle () {
 		[string] $name, [string] $text )
 
 	$brdr				= Create-Panel -height $height -width $width -top $top -left $left -name "border" -text ""
-	$drwr				= Create-Panel -height 300 -width $width -top ($top+$height) -left 2 -name "drawer" -text $name
+	$drwr				= Create-Panel -height 300 -width $width -top ($top+$height) -left 2 -name "$($name)Drawer" -text $name
 	$drwr.Visible		= $false
 	$drwr.BorderStyle	= "FixedSingle"
 	Set-Drawers -parent $drwr
@@ -213,7 +230,11 @@ Function Create-Handle () {
 	$btn.BorderStyle	= "FixedSingle"
 	$btn.add_Click({
 		$initialwidth=$this.width
+		$form = $this.parent.parent.parent.parent
 		$scroller = $this.parent.parent
+		$draftbtn = $form.controls.find("DraftBtn",$true)[0]
+		$draftbtn.enabled = $false
+
 		$plyrbtn = $scroller.controls[0]
 		$plyrdrwr = $scroller.controls[1]
 
@@ -263,10 +284,22 @@ Function Create-Handle () {
 			$this.parent.parent.controls[$idx].visible = $false
 			$this.parent.BackColor = [System.Drawing.Color]::FromName("Buttonface")
 		}
+		
+		$plyrbtn = $null
+		$plyrdrwr = $null
+		$ownrbtn = $null
+		$ownrdrwr = $null
+		$rndbtn = $null
+		$rnddrwr = $null
+		$draftbtn = $null
+		$scroller = $null
+		$form = $null
 	})
 
 	$brdr.controls.add($btn)
 	$parent.controls.addRange(@($brdr,$drwr))
+	$parent = $null
+	$btn = $null
 	$brdr = $null
 	$drwr = $null
 }
@@ -274,20 +307,23 @@ Function Load-Data () {
 	Get-DraftOrder
 	$global:dataset = New-Object -TypeName System.Collections.Generic.List[PsObject]
 
-	$obj=Import-CSV -Delimiter "," -Path "H:\Fantasy Football\2021\data\Fantasy Pros ADP.csv"
-	$global:teams = Import-CSV -Delimiter "," -Path "H:\Fantasy Football\2021\data\Teams.csv"
+	#$obj=Import-CSV -Delimiter "," -Path "H:\Fantasy Football\2021\scripts\powershell\data\Fantasy Pros ADP.csv"
+	$obj=Import-CSV -Delimiter "," -Path  (Join-Path $PSScriptRoot "..\data\Fantasy Pros ADP.csv")
+	$global:teams = Import-CSV -Delimiter "," -Path (Join-Path $PSScriptRoot "..\data\Teams.csv")
 	Initialize-PositionCounts
 
 	$obj | ForEach-Object -Process {
 		Increment-PositionCounts -position $_.Position
-		Switch ($_.Team) {
-			"JAC" { $_.Team="JAX" }
-			"GB" { $_.Team="GBP" }
-			"NE" { $_.Team="NEP" }
-			"TB" { $_.Team="TBB" }
-			"SF" { $_.Team="SFO" }
-			"KC" { $_.Team="KCC" }
-		}
+
+		if ($_.Team -eq "JAC") {$_.Team="JAX"}
+		if ($_.Team -eq "GB") {$_.Team="GBP"}
+		if ($_.Team -eq "NE") {$_.Team="NEP"}
+		if ($_.Team -eq "TB") {$_.Team="TBB"}
+		if ($_.Team -eq "SF") {$_.Team="SFO"}
+		if ($_.Team -eq "KC") {$_.Team="KCC"}
+		if ($_.Team -eq "NO") {$_.Team="NOS"}
+		if ($_.Team -eq "LV") {$_.Team="LVR"}
+
 		$tm = Convert-TeamNames -team $_.Team
 		if ($_.Position -eq "K") {$_.Position="PK"} 
 		if ($_.Position -eq "DEF") {$_.Position="DST"}
@@ -308,17 +344,23 @@ Function Load-Data () {
 		$global:dataset.Add(($curatedobj | Select-Object -Property Rank,Name,
 						Position,Team,Selected,Overall,Round,Pick,Owner,Card))
 	}
+	$curatedobj = $null
 }
 Function Create-Cards () {
 	[CmdletBinding()]
 	param (	[object] $parent, $data )
+	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
 	$tmpcollection = New-Object -TypeName System.Collections.Generic.List[PsObject]
 	$scrlr = Create-Scroller -parent $parent -name "cardscroller" -height 592 -width 695 -top 55 -left 2.5
 
 	$data | ForEach-Object -Process {
-		$card=Create-Panel -height 78 -width 670 -top 0 -left 0 -name "Card $($_.Rank)" -text "Card #$($_.Rank)"
-		$card.BorderStyle="FixedSingle"
-		$card.Visible = $true
+		$brdr=Create-Panel -height 78 -width 670 -top 0 -left 0 -name "CardBorder $($_.Rank)" -text "CrdBrdr #$($_.Rank)"
+		$brdr.BorderStyle="FixedSingle"
+		$brdr.BackColor = $buttonface
+		
+		$card=Create-Panel -height 70 -width 662 -top 3 -left 2 -name "Card $($_.Rank)" -text "Card #$($_.Rank)"
+		$card.BackColor = $buttonface
+		$brdr.controls.add($card)
 		Create-Rank -parent $card -item $_
 		Create-PlayerDetails -parent $card -item $_
 		Create-Drafted -parent $card -item $_
@@ -326,12 +368,16 @@ Function Create-Cards () {
 			$nmecntrl=$this.controls.Find("PlyrDetails",$true)[0].controls[0]
 			$poscntrl=$this.controls.Find("PlyrDetails",$true)[0].controls[1]
 			$poscntrl.Left = $nmecntrl.Width + 3
+			
 			$nmecntrl = $null
 			$poscntrl = $null
 		})
-		$_.Card = $card
-		$tmpcollection.add($card)
+
+		$_.Card = $brdr
+		$tmpcollection.add($brdr)
+
 		$card = $null
+		$brdr = $null
 	}
 	$scrlr.visible = $false
 	$scrlr.controls.addRange($tmpcollection)
@@ -340,6 +386,8 @@ Function Create-Cards () {
 
 	$parent.controls.add($scrlr)
 	$scrlr = $null
+	$parent=$null
+	$data=$null
 }
 Function Create-Toggles () {
 	[CmdletBinding()]
@@ -349,7 +397,9 @@ Function Create-Toggles () {
 	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
 
 	$box = Create-Panel -height 36 -width 406 -top 18 -left 2 -name "togglebx" -text "toggles"
-	$txt = Create-Panel -height 31 -width 285.4 -top 20 -left 407 -name "ListName" -text "ListName"
+	$txt = Create-Label -height 31 -width 285.4 -top 20 -left 407 -name "ListName" -text ""
+	$txt.TextAlign="MiddleCenter"
+	$txt.Font = $MsansLargeBold
 	$txt.BorderStyle="FixedSingle"
 	$parent.controls.add($txt)
 
@@ -391,8 +441,36 @@ Function Create-Toggles () {
 		$global:maastertoggles.add($obj)
 	}
 	$parent.controls.add($box)
-	$box = $null
+	$hdr = $null
 	$txt = $null
+	$box = $null
+	$pnltop = $null
+	$pnlbottom = $null
+	$parent = $null
+}
+Function Select-Card () {
+	[CmdletBinding()]
+		param (	[object] $border )
+	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
+	$highlight=[System.Drawing.Color]::FromARGB(0,120,215)
+
+	$border.parent.controls | Where {$_.BackColor -eq $highlight} | ForEach-Object { $_.BackColor = $buttonface }
+
+	$drftbtn=$border.parent.parent.parent.controls.Find("DraftBtn",$true)[0]
+	$plyrdrft=$border.controls.Find("Drafted-Undrafted",$true)[0]
+	if ($border.parent.parent.parent.controls.Find("Players",$true)[0].parent.BackColor -ne $buttonface) {
+		if ($plyrdrft.Text -eq "Drafted") {
+			$drftbtn.enabled=$false
+		} else {
+			$border.parent.parent.parent.controls.Find("DraftBtn",$true)[0].enabled = $true
+			$border.parent.parent.parent.controls.Find("DraftBtn",$true)[0].focus()
+		}
+	}
+
+	if ( $border.BackColor -eq [System.Drawing.Color]::FromName("Buttonface") ) {
+		$border.BackColor=$highlight } else { $border.BackColor=$buttonface }
+
+	$border=$null
 }
 Function Select-Toggle () {
 	[CmdletBinding()]
@@ -426,11 +504,12 @@ Function Select-Toggle () {
 
 	$bx.enabled = $true
 	
-	$right = $null
-	$btn = $null
 	$bx = $null
 	$hdr = $null
+	$btn = $null
 	$brdr = $null
+	$right = $null
+	$toggle = $null
 }
 Function Get-SelectedToggles () {
 	[CmdletBinding()]
@@ -471,6 +550,8 @@ Function Get-SelectedPosition() {
 		$filteredplayers.add($_)
 	}
 	return $filteredplayers
+	$toggle = $null
+	$positions = $null
 }
 Function Update-PositionCounts () {
 	[CmdletBinding()]
@@ -499,8 +580,9 @@ Function Update-PositionCounts () {
 		$_.BackColor=$buttonface
 	}
 	$tglecol.enabled=$true
-	$right = $null
 	$tglecol = $null
+	$right = $null
+	$element = $null
 }
 Function Toggle-PositionFilters () {
 	[CmdletBinding()]
@@ -523,9 +605,14 @@ Function Toggle-PositionFilters () {
 	$scroller.controls.Clear()
 	$scroller.controls.addRange($tmpcollection)
 	$scroller.visible = $true
-	
+
 	$scroller = $null
+	$right = $null
+	$tglebx = $null
+	$filteredpos = $null
+	$filtereddata = $null
 	$tmpcollection = $null
+	$element = $null
 }
 Function Get-DraftOrder () {
 	$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
@@ -564,6 +651,8 @@ Function Get-DraftOrder () {
 			}
 		}
 	}
+	
+	$olist = $null
 }
 Function Get-NextPicks () {
 	[CmdletBinding()]
@@ -574,17 +663,113 @@ Function Get-NextPicks () {
 
 	$lbl = Create-Label -height 30 -width 197 -top 18 -left 0 -name "ClockTxt" -text $onclock
 	$lbl.Padding = New-Object System.Windows.Forms.Padding(25,0,0,0)
-	$lbl.Font = $MsansXsmallBold
-	#$lbl.TextAlign = "MiddleCenter"
+	$lbl.Font = $MsansSmallBold
 	$clock.controls.add($lbl)
 
 	$lbl = Create-Label -height 30 -width 197 -top 18 -left 0 -name "DeckTxt" -text $ondeck
 	$lbl.Padding = New-Object System.Windows.Forms.Padding(25,0,0,0)
-	$lbl.Font = $MsansXsmallBold
-	#$lbl.TextAlign = "MiddleCenter"
+	$lbl.Font = $MsansSmallBold
 	$deck.controls.add($lbl)
 	
 	$lbl = $null
 	$onclock = $null
 	$ondeck = $null
+	$clock = $null
+	$deck = $null
+}
+Function Get-CurrentPickNo () {
+	$global:owners | Where-Object -Property Time -eq '' | Sort-Object -Property Overall | 
+		Select-Object -Property Overall -First 1 | ForEach-Object -Process { return $_.Overall }
+}
+Function Draft-Player () {
+	[CmdletBinding()]
+		param (	[object] $control )
+	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
+	$highlight=[System.Drawing.Color]::FromARGB(0,120,215)
+
+	$form = $control.parent.parent
+	$togglebx = $form.controls.Find("togglebx",$true)[0]
+	$scroller = $form.controls.Find("cardscroller",$true)[0]
+	$scroller.controls | Where {$_.BackColor -eq $highlight} | ForEach-Object -Proces {
+		$name = $_.controls[0].controls[1].controls[0].Text 
+		$rank = $_.controls[0].controls[0].controls[1].Text
+		$pos  = $_.controls[0].controls[1].controls[1].Text.Replace("(","").Replace(")","")
+		$team = $_.controls[0].controls[1].controls[2].Text
+		$currentpick=(Get-CurrentPickNo)
+
+		$global:owners | Where-Object {$_.Overall -eq $($currentpick)} | ForEach-Object -Process {
+			$round	= $_.Round
+			$pick	= $_.Pick
+			$owner	= $_.Owner
+			$_.Time	= $(Get-Date -Format o).Replace(":",".")
+		}
+
+		$_.controls[0].controls[2].controls[0].Text = $currentpick
+		$_.controls[0].controls[2].controls[1].Text = $round
+		$_.controls[0].controls[2].controls[2].Text = $pick
+		$_.controls[0].controls[2].controls[3].Text = $owner
+		
+		$global:dataset | Where-Object {(($_.Name -eq $name) -and ($_.Rank -eq $rank))} | ForEach-Object -Process {
+			$_.Overall=$currentpick
+			$_.Round=$round
+			$_.Pick=$pick
+			$_.owner=$owner
+			$_.Selected = $true
+		}
+		$global:onclock.controls[0].Text = ($global:owners | Where-Object {$_.Overall -eq $($currentpick+1)}).Owner
+		$global:ondeck.controls[0].Text  = ($global:owners | Where-Object {$_.Overall -eq $($currentpick+2)}).Owner
+
+		$_.controls[0].controls[2].controls[4].Text = "Drafted"
+
+		$Available=$scroller.parent.parent.controls.Find("Available Players",$true)[0]
+		Select-MenuItem -menuitem $Available
+		Update-Players -panel $form.controls[1] -filter "Available Players"
+		Update-PositionCounts -element $togglebx
+		$Available = $null
+	}
+	$draftbtn = $form.controls.Find("DraftBtn",$true)[0]
+	$draftbtn.enabled=$false
+
+	$form = $null
+	$togglebx = $null
+	$scroller = $null
+	$form = $null
+	$control = $null
+}
+Function Undraft-Player () {
+	[CmdletBinding()]
+		param (	[object] $control )
+
+	$lastpic = $(Get-CurrentPickNo) - 1
+	#$global:owners | Where-Object -Property Overall -eq $lastpic | Sort-Object -Property Overall | Out-GridView
+	
+	$form = $control.parent.parent
+	$togglebx = $form.controls.Find("togglebx",$true)[0]
+	$scroller = $form.controls.Find("cardscroller",$true)[0]
+	$global:dataset | Where-Object -Property Overall -eq $lastpic | ForEach-Object -Process {
+		$_.Selected = $false
+		$_.Overall = ""
+		$_.Round = ""
+		$_.Pick = ""
+		$_.Owner = ""
+		$_.Card.controls[0].controls[2].controls[0].Text = ""
+		$_.Card.controls[0].controls[2].controls[1].Text = ""
+		$_.Card.controls[0].controls[2].controls[2].Text = ""
+		$_.Card.controls[0].controls[2].controls[3].Text = ""
+		$_.Card.controls[0].controls[2].controls[4].Text = "Undrafted"
+
+		$Available=$form.controls.Find("Available Players",$true)[0]
+		Select-MenuItem -menuitem $Available
+		Update-Players -panel $form.controls[1] -filter "Available Players"
+		Update-PositionCounts -element $togglebx
+		$Available = $null
+	}
+	$global:owners | Where-Object -Property Overall -eq $lastpic | ForEach-Object -Process {
+		$_.Time = ""
+	}
+	$global:onclock.controls[0].Text = ($global:owners | Where-Object {$_.Overall -eq $($lastpic)}).Owner
+	$global:ondeck.controls[0].Text  = ($global:owners | Where-Object {$_.Overall -eq $($lastpic+1)}).Owner
+	
+	$draftbtn = $form.controls.Find("DraftBtn",$true)[0]
+	$draftbtn.enabled=$false
 }

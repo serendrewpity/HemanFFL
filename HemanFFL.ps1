@@ -22,9 +22,12 @@ Function Main-Routine() {
 	$actionstatus=Create-Groupbox -height 213 -width 204 -top 432 -left 5 -name "actionstatus" -text ""
 	$global:onclock=Create-Groupbox -height 50 -width 198 -top 105 -left 3 -name "onclock" -text "On the Clock"
 	$global:ondeck=Create-Groupbox -height 50 -width 198 -top 158 -left 3 -name "ondeck" -text "On Deck"
-	$draft=Create-Button -height 40 -width 195 -top 16 -left 5 -text "Draft Player"
-	$undo=Create-Button -height 40 -width 195 -top 60 -left 5 -text "Undo Last Pick"
+	$draft=Create-Button -height 40 -width 195 -top 16 -left 5 -name "DraftBtn" -text "Draft Player"
+	$undo=Create-Button -height 40 -width 195 -top 60 -left 5 -name "UndoBtn" -text "Undo Last Pick"
 	$actionstatus.controls.addRange(@($draft,$undo,$onclock,$ondeck))
+	$draft.add_Click({Draft-Player -control $this.parent})
+	$undo.add_Click({Undraft-Player -control $this.parent})
+	$draft.enabled = $false
 
 	Create-Toggles -parent $RightPanel
 	Create-Cards -parent $RightPanel -data $global:currentdata
@@ -32,7 +35,18 @@ Function Main-Routine() {
 
 	$LeftPanel.controls.addRange(@($MenuScroller,$actionstatus))
 	$MainForm.controls.addRange(@($LeftPanel,$RightPanel))
+
+	$Available=$MainForm.controls.Find("Available Players",$true)[0]
+	Select-MenuItem -menuitem $Available
+	$Available = $null
+
+	$PlayersDrwr=$MainForm.controls.Find("PlayersDrawer",$true)[0]
+	$PlayersDrwr.visible = $true
+	$PlayersDrwr = $null
+
 	$MainForm.ShowDialog()
+	$global:dataset | ForEach-Object -Process { $_.Card.Dispose()}
+	$global:currentdata | ForEach-Object -Process { $_.Card.Dispose()}
 
 	$LeftPanel.Dispose()
 	$RightPanel.Dispose()

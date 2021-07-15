@@ -38,6 +38,7 @@ Function Main-Routine() {
 
 	$Available=$MainForm.controls.Find("Available Players",$true)[0]
 	Select-MenuItem -menuitem $Available
+	Update-Players -panel $MainForm.controls[1] -filter "Available Players"
 	$Available = $null
 
 	$PlayersDrwr=$MainForm.controls.Find("PlayersDrawer",$true)[0]

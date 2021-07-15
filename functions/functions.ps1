@@ -126,7 +126,7 @@ Function Get-PlayerCards () {
 	} elseif ($filter -in $plist ) {
 		$data = $($global:dataset | Where-Object -Property Position -eq $($hash[$filter]))
 	} elseif ($filter -eq "Available Players") {
-		$data = $($global:dataset | Where-Object -Property Selected -ne $true)
+		$data = $($global:dataset | Where-Object -Property Selected -eq $false)
 	} else {
 		$data = $global:dataset
 	}
@@ -275,6 +275,18 @@ Function Create-Handle () {
 			$this.width=$this.width-4
 			$this.height=$this.height-4
 			$this.parent.parent.controls[$idx].visible = $true
+			if ($this.Text -eq "Players") { 
+				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[1].controls[0]
+				Update-Players -panel $form.controls[1] -filter "Available Players"
+			} elseif ($this.Text -eq "Owners") { 
+				$pick=[int] ($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Pick - 1
+				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[$pick].controls[0]
+				Update-Players -panel $form.controls[1] -filter $this.parent.parent.controls[$idx].controls[0].controls[$pick].controls[0].Text
+			} else { 
+				$round=($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Round - 1
+				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[$round].controls[0]
+				Update-Players -panel $form.controls[1] -filter $this.parent.parent.controls[$idx].controls[0].controls[$round].controls[0].Text
+			}
 			$this.parent.BackColor = [System.Drawing.Color]::FromARGB(0,120,215)
 		} else {
 			$this.Top=0
@@ -284,7 +296,7 @@ Function Create-Handle () {
 			$this.parent.parent.controls[$idx].visible = $false
 			$this.parent.BackColor = [System.Drawing.Color]::FromName("Buttonface")
 		}
-		
+			
 		$plyrbtn = $null
 		$plyrdrwr = $null
 		$ownrbtn = $null
@@ -303,13 +315,82 @@ Function Create-Handle () {
 	$brdr = $null
 	$drwr = $null
 }
+function Get-ADPRanking () {
+
+	$ADPRankingCSV = (Join-Path $PSScriptRoot ..\data\adprankings.csv)
+	$proto="https:"
+	$fqdn="docs.google.com"
+	$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
+	$sheet="0"
+	$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
+
+	if ( -not (Test-Path $ADPRankingCSV) ) {
+		Invoke-WebRequest -Uri "$proto//$fqdn/$path" -Outfile $ADPRankingCSV
+	}
+	return $ADPRankingCSV
+}
+Function Get-Teams () {
+
+	$teams = (Join-Path $PSScriptRoot ..\data\teams.csv)
+	$proto="https:"
+	$fqdn="docs.google.com"
+	$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
+	$sheet="1459467330"
+	$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
+	
+	if ( -not (Test-Path $teams) ) {
+		Invoke-WebRequest -Uri "$proto//$fqdn/$path" -Outfile $teams
+	}
+	return $teams
+}
+Function Get-Owners () {
+
+	$owners = (Join-Path $PSScriptRoot ..\data\owners.csv)
+	$proto="https:"
+	$fqdn="docs.google.com"
+	$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
+	$sheet="1991182108"
+	$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
+	
+	if ( -not (Test-Path $owners) ) {
+		Invoke-WebRequest -Uri "$proto//$fqdn/$path" -Outfile $owners
+	}
+	return $owners
+}
+Function Load-LiveDraft () {
+	$draft = (Join-Path $PSScriptRoot ..\data\selections.csv)
+	if ( Test-Path $draft ) {
+		$livedraftcsv=Import-CSV -Delimiter "," -Path $draft
+		$livedraftcsv | Where-Object -Property Selected -eq $True | ForEach-Object -Process {
+			$rank = $_.Rank
+			$name = $_.Name
+			$team = $_.Team
+			$selected = $_.Selected
+			$overall = $_.Overall
+			$round = $_.Round
+			$pick = $_.Pick
+			$owner = $_.Owner
+			$global:dataset | Where-Object {( ($_.Rank -eq $rank) -and ($_.Name -eq $name) -and ($_.Team -eq $team) )} | 
+				ForEach-Object -Process {
+					$_.Selected = $selected
+					$_.Overall = $overall
+					$_.Round = $round
+					$_.Pick = $pick
+					$_.Owner = $owner
+				}
+		}
+		$global:owners | Where-OBject -Property Time -eq '' | Sort-Object -Property Overall | Select-Object -First 1
+	}
+
+}
 Function Load-Data () {
 	Get-DraftOrder
 	$global:dataset = New-Object -TypeName System.Collections.Generic.List[PsObject]
 
 	#$obj=Import-CSV -Delimiter "," -Path "H:\Fantasy Football\2021\scripts\powershell\data\Fantasy Pros ADP.csv"
-	$obj=Import-CSV -Delimiter "," -Path  (Join-Path $PSScriptRoot "..\data\Fantasy Pros ADP.csv")
-	$global:teams = Import-CSV -Delimiter "," -Path (Join-Path $PSScriptRoot "..\data\Teams.csv")
+	#$obj=Import-CSV -Delimiter "," -Path  (Join-Path $PSScriptRoot "..\data\Fantasy Pros ADP.csv")
+	$obj=Import-CSV -Delimiter "," -Path  (Get-ADPRanking)
+	$global:teams = Import-CSV -Delimiter "," -Path (Get-Teams)
 	Initialize-PositionCounts
 
 	$obj | ForEach-Object -Process {
@@ -345,108 +426,7 @@ Function Load-Data () {
 						Position,Team,Selected,Overall,Round,Pick,Owner,Card))
 	}
 	$curatedobj = $null
-}
-Function Create-Cards () {
-	[CmdletBinding()]
-	param (	[object] $parent, $data )
-	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
-	$tmpcollection = New-Object -TypeName System.Collections.Generic.List[PsObject]
-	$scrlr = Create-Scroller -parent $parent -name "cardscroller" -height 592 -width 695 -top 55 -left 2.5
-
-	$data | ForEach-Object -Process {
-		$brdr=Create-Panel -height 78 -width 670 -top 0 -left 0 -name "CardBorder $($_.Rank)" -text "CrdBrdr #$($_.Rank)"
-		$brdr.BorderStyle="FixedSingle"
-		$brdr.BackColor = $buttonface
-		
-		$card=Create-Panel -height 70 -width 662 -top 3 -left 2 -name "Card $($_.Rank)" -text "Card #$($_.Rank)"
-		$card.BackColor = $buttonface
-		$brdr.controls.add($card)
-		Create-Rank -parent $card -item $_
-		Create-PlayerDetails -parent $card -item $_
-		Create-Drafted -parent $card -item $_
-		$card.add_Paint({
-			$nmecntrl=$this.controls.Find("PlyrDetails",$true)[0].controls[0]
-			$poscntrl=$this.controls.Find("PlyrDetails",$true)[0].controls[1]
-			$poscntrl.Left = $nmecntrl.Width + 3
-			
-			$nmecntrl = $null
-			$poscntrl = $null
-		})
-
-		$_.Card = $brdr
-		$tmpcollection.add($brdr)
-
-		$card = $null
-		$brdr = $null
-	}
-	$scrlr.visible = $false
-	$scrlr.controls.addRange($tmpcollection)
-	$scrlr.visible = $true
-	$tmpcollection = $null
-
-	$parent.controls.add($scrlr)
-	$scrlr = $null
-	$parent=$null
-	$data=$null
-}
-Function Create-Toggles () {
-	[CmdletBinding()]
-		param (	[object] $parent )
-	$navy=[System.Drawing.Color]::FromARGB(31,45,86)
-	$white=[System.Drawing.Color]::FromName("White")
-	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
-
-	$box = Create-Panel -height 36 -width 406 -top 18 -left 2 -name "togglebx" -text "toggles"
-	$txt = Create-Label -height 31 -width 285.4 -top 20 -left 407 -name "ListName" -text ""
-	$txt.TextAlign="MiddleCenter"
-	$txt.Font = $MsansLargeBold
-	$txt.BorderStyle="FixedSingle"
-	$parent.controls.add($txt)
-
-	$iWidth = 4
-	
-	$global:currentdata = $global:dataset
-	$global:maastertoggles = New-Object -TypeName System.Collections.Generic.List[PsObject]
-	"QB", "RB", "WR", "TE", "PK", "DST" | ForEach-Object {
-		$count=($global:currentdata | Where-Object -Property Position -eq $_).count
-		$hdr=Create-Label -height 30 -width 28 -top 0 -left 0 -name "$($_)Txt" -text $_
-		$hdr.TextAlign="MiddleCenter"
-		$hdr.BackColor = $navy
-		$hdr.ForeColor = $white
-		$hdr.Font = $MsansXsmallBold
-		$hdr.add_Click({$this.parent.add_Click})
-
-		$pnlbottom=Create-Label -height 31 -width 65 -top 0 -left 0 -name "$($_)bottom" -text $count
-		if ($global:poscnts.DST -lt 10) {$pad=36.5} elseif ($global:poscnts.DST -lt 100) {$pad=34.5} else {$pad=32.5}
-		$pnlbottom.Padding=New-Object System.Windows.Forms.Padding($pad, 0, 0, 0)
-		$pnlbottom.Font = $MsansXsmallBold
-		$pnlbottom.BackColor = $buttonface
-		$pnlbottom.add_Click({Toggle-PositionFilters -element $this})
-
-		$pnltop=Create-Label -height 31 -width 65 -top 1.5 -left $iWidth -name "$($_)top" -text ""
-		$pnltop.BorderStyle="FixedSingle"
-		$pnltop.BackColor = $buttonface
-
-		$pnlbottom.controls.add($hdr)
-		$pnltop.controls.add($pnlbottom)
-		$box.controls.add($pnltop)
-		$iWidth+=67
-
-		$props=[ordered]@{
-			Count = $count
-			Position = $_
-			Toggle = $pnltop
-		}
-		$obj=New-Object -TypeName PsObject -Property $props
-		$global:maastertoggles.add($obj)
-	}
-	$parent.controls.add($box)
-	$hdr = $null
-	$txt = $null
-	$box = $null
-	$pnltop = $null
-	$pnlbottom = $null
-	$parent = $null
+	Load-LiveDraft
 }
 Function Select-Card () {
 	[CmdletBinding()]
@@ -615,51 +595,65 @@ Function Toggle-PositionFilters () {
 	$element = $null
 }
 Function Get-DraftOrder () {
-	$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
-	$olist=@("Drew","Massachusetts 420","Nathan","Jax",
-			"Darkside","ATLien","Stuart","Marinomania",
-			"Y.W.Snappers","Sheriff","Pete","Riverside")
+	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
+	if ( Test-Path $draftorder ) {
+		$global:owners=Import-CSV -Delimiter "," -Path $draftorder
+	} else {
+		$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
+		$olist = New-Object -TypeName System.Collections.Generic.List[PsObject]
+		$obj=Import-CSV -Delimiter "," -Path  (Get-Owners)
+		$obj | ForEach-Object -Process { $olist.Add($_.Name) }
+		# $olist=@("Drew","Massachusetts 420","Nathan","Jax","Darkside","ATLien",
+		#	"Stuart","Marinomania","Y.W.Snappers","Sheriff","Pete","Riverside")
 
-	$icnt = 1
-	1..16 | ForEach-Object -Process {
-		$idx = $_
-		if (($_ % 2) -eq 0) {
-			($olist.Length-1)..0 | ForEach-Object {
-				$props=[ordered]@{
-					Overall = $icnt
-					Pick = 12-$_
-					Round = $idx
-					Owner = $olist[$_]
-					Time = ''
+		$icnt = 1
+		1..16 | ForEach-Object -Process {
+			$idx = $_
+			if (($_ % 2) -eq 0) {
+				($olist.Count-1)..0 | ForEach-Object {
+					$props=[ordered]@{
+						Overall = [int] $icnt
+						Pick = [int] 12-$_
+						Round = [int] $idx
+						Owner = $olist[$_]
+						Player = ''
+						Position = ''
+						Team = ''
+						Rank = ''
+						Time = ''
+					}
+					$obj = New-Object -TypeName PSObject -Property $props
+					$global:owners.add(($obj | Select-Object -Property Overall, Pick, Round, Owner, Player, Position, Team, Rank, Time))
+					$icnt += 1
 				}
-				$obj = New-Object -TypeName PSObject -Property $props
-				$global:owners.add(($obj | Select-Object -Property Overall, Pick, Round, Owner, Time))
-				$icnt += 1
-			}
-		} else {
-			0..($olist.Length-1) | ForEach-Object {
-				$props=[ordered]@{
-					Overall = $icnt
-					Pick = $_+1
-					Round = $idx
-					Owner = $olist[$_]
-					Time = ''
+			} else {
+				0..($olist.Count-1) | ForEach-Object {
+					$props=[ordered]@{
+						Overall = [int] $icnt
+						Pick = [int] $_+1
+						Round = [int] $idx
+						Owner = $olist[$_]
+						Player = ''
+						Position = ''
+						Team = ''
+						Rank = ''
+						Time = ''
+					}
+					$obj = New-Object -TypeName PSObject -Property $props
+					$global:owners.add(($obj | Select-Object -Property Overall, Pick, Round, Owner, Player, Position, Team, Rank, Time))
+					$icnt += 1
 				}
-				$obj = New-Object -TypeName PSObject -Property $props
-				$global:owners.add(($obj | Select-Object -Property Overall, Pick, Round, Owner, Time))
-				$icnt += 1
 			}
 		}
 	}
-	
 	$olist = $null
 }
 Function Get-NextPicks () {
 	[CmdletBinding()]
 		param (	[object] $clock, [object] $deck )
 
-	$onclock=($global:owners | Select-Object -First 1).Owner
-	$ondeck=(($global:owners | Select-Object -First 2) | Select-Object -Skip 1).Owner
+	$onclock=($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Owner
+	$ondeck=(($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall }  | Select-Object -First 2) | Select-Object -Skip 1).Owner
 
 	$lbl = Create-Label -height 30 -width 197 -top 18 -left 0 -name "ClockTxt" -text $onclock
 	$lbl.Padding = New-Object System.Windows.Forms.Padding(25,0,0,0)
@@ -701,6 +695,10 @@ Function Draft-Player () {
 			$round	= $_.Round
 			$pick	= $_.Pick
 			$owner	= $_.Owner
+			$_.Player	= $name
+			$_.Position = $pos
+			$_.Team	= $team
+			$_.Rank	= $rank
 			$_.Time	= $(Get-Date -Format o).Replace(":",".")
 		}
 
@@ -728,13 +726,25 @@ Function Draft-Player () {
 		$Available = $null
 	}
 	$draftbtn = $form.controls.Find("DraftBtn",$true)[0]
-	$draftbtn.enabled=$false
+	$draftbtn.enabled = $false
+	Save-Draft
+	Save-Owners
 
 	$form = $null
 	$togglebx = $null
 	$scroller = $null
 	$form = $null
 	$control = $null
+}
+Function Save-Owners () {
+	$owners = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
+	$global:owners | Select-Object -Property Overall, Pick, Round, Owner, Player, Position, Team, Rank, Time | 
+			Export-Csv $owners -NoTypeInformation
+}
+Function Save-Draft () {
+	$draft = (Join-Path $PSScriptRoot ..\data\selections.csv)
+		$global:dataset | Select-Object -Property Rank, Name, Position, Team,
+			Selected, Overall, Round, Pick, Owner | Export-Csv $draft -NoTypeInformation
 }
 Function Undraft-Player () {
 	[CmdletBinding()]

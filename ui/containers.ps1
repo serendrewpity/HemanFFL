@@ -26,6 +26,108 @@ Function Create-Scroller () {
 
 	return $flowpanel
 }
+Function Create-Cards () {
+	[CmdletBinding()]
+	param (	[object] $parent, $data )
+	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
+	$tmpcollection = New-Object -TypeName System.Collections.Generic.List[PsObject]
+	$scrlr = Create-Scroller -parent $parent -name "cardscroller" -height 592 -width 695 -top 55 -left 2.5
+
+	$data | ForEach-Object -Process {
+		$brdr=Create-Panel -height 78 -width 670 -top 0 -left 0 -name "CardBorder $($_.Rank)" -text "CrdBrdr #$($_.Rank)"
+		$brdr.BorderStyle="FixedSingle"
+		$brdr.BackColor = $buttonface
+		
+		$card=Create-Panel -height 70 -width 662 -top 3 -left 2 -name "Card $($_.Rank)" -text "Card #$($_.Rank)"
+		$card.BackColor = $buttonface
+		$brdr.controls.add($card)
+		Create-Rank -parent $card -item $_
+		Create-PlayerDetails -parent $card -item $_
+		Create-Drafted -parent $card -item $_
+		$card.add_Paint({
+			$nmecntrl=$this.controls.Find("PlyrDetails",$true)[0].controls[0]
+			$poscntrl=$this.controls.Find("PlyrDetails",$true)[0].controls[1]
+			$poscntrl.Left = $nmecntrl.Width + 3
+			
+			$nmecntrl = $null
+			$poscntrl = $null
+		})
+
+		$_.Card = $brdr
+		$tmpcollection.add($brdr)
+
+		$card = $null
+		$brdr = $null
+	}
+	$scrlr.visible = $false
+	$scrlr.controls.addRange($tmpcollection)
+	$scrlr.visible = $true
+	$tmpcollection = $null
+
+	$parent.controls.add($scrlr)
+	$scrlr = $null
+	$parent=$null
+	$data=$null
+}
+Function Create-Toggles () {
+	[CmdletBinding()]
+		param (	[object] $parent )
+	$navy=[System.Drawing.Color]::FromARGB(31,45,86)
+	$white=[System.Drawing.Color]::FromName("White")
+	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
+
+	$box = Create-Panel -height 36 -width 406 -top 18 -left 2 -name "togglebx" -text "toggles"
+	$txt = Create-Label -height 31 -width 285.4 -top 20 -left 407 -name "ListName" -text ""
+	$txt.TextAlign="MiddleCenter"
+	$txt.Font = $MsansLargeBold
+	$txt.BorderStyle="FixedSingle"
+	$parent.controls.add($txt)
+
+	$iWidth = 4
+	
+	$global:currentdata = $global:dataset
+	$global:maastertoggles = New-Object -TypeName System.Collections.Generic.List[PsObject]
+	"QB", "RB", "WR", "TE", "PK", "DST" | ForEach-Object {
+		$count=($global:currentdata | Where-Object -Property Position -eq $_).count
+		$hdr=Create-Label -height 30 -width 28 -top 0 -left 0 -name "$($_)Txt" -text $_
+		$hdr.TextAlign="MiddleCenter"
+		$hdr.BackColor = $navy
+		$hdr.ForeColor = $white
+		$hdr.Font = $MsansXsmallBold
+		$hdr.add_Click({$this.parent.add_Click})
+
+		$pnlbottom=Create-Label -height 31 -width 65 -top 0 -left 0 -name "$($_)bottom" -text $count
+		if ($global:poscnts.DST -lt 10) {$pad=36.5} elseif ($global:poscnts.DST -lt 100) {$pad=34.5} else {$pad=32.5}
+		$pnlbottom.Padding=New-Object System.Windows.Forms.Padding($pad, 0, 0, 0)
+		$pnlbottom.Font = $MsansXsmallBold
+		$pnlbottom.BackColor = $buttonface
+		$pnlbottom.add_Click({Toggle-PositionFilters -element $this})
+
+		$pnltop=Create-Label -height 31 -width 65 -top 1.5 -left $iWidth -name "$($_)top" -text ""
+		$pnltop.BorderStyle="FixedSingle"
+		$pnltop.BackColor = $buttonface
+
+		$pnlbottom.controls.add($hdr)
+		$pnltop.controls.add($pnlbottom)
+		$box.controls.add($pnltop)
+		$iWidth+=67
+
+		$props=[ordered]@{
+			Count = $count
+			Position = $_
+			Toggle = $pnltop
+		}
+		$obj=New-Object -TypeName PsObject -Property $props
+		$global:maastertoggles.add($obj)
+	}
+	$parent.controls.add($box)
+	$hdr = $null
+	$txt = $null
+	$box = $null
+	$pnltop = $null
+	$pnlbottom = $null
+	$parent = $null
+}
 Function Create-Drafted () {
 	[CmdletBinding()]
 	param (	[object] $parent, [PsObject] $item )
@@ -36,7 +138,8 @@ Function Create-Drafted () {
 	$box.add_Click({ Select-Card -border $this.parent.parent })
 	$box.BorderStyle="FixedSingle"
 
-	$hdr=Create-Label -height 22 -width 260 -top 0 -left 0 -name "Drafted-Undrafted" -text "Undrafted"
+	If ( $item.Selected ) { $status = "Drafted" } else { $status = "Undrafted" }
+	$hdr=Create-Label -height 22 -width 260 -top 0 -left 0 -name "Drafted-Undrafted" -text $status
 	$hdr.add_Click({ Select-Card -border $this.parent.parent.parent })
 	$hdr.Padding=New-Object System.Windows.Forms.Padding(5, 0, 0, 0)
 	$hdr.BackColor = $navy

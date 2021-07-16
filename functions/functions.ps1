@@ -597,9 +597,9 @@ Function Toggle-PositionFilters () {
 Function Get-DraftOrder () {
 	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
 	if ( Test-Path $draftorder ) {
-		$global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression=[int]$_.Overall},
-						@{Name='Round';Expression=[int]$_.Round},@{Name='Pick';Expression=[int]$_.Pick}, Owner, Player, Position, Team,
-						@{Name='Rank';Expression=[int]$_.Rank},@{Name='Time';Expression=[datetime]$_.Time}
+		$global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression={[int] $_.Overall}},
+						@{Name='Round';Expression={[int] $_.Round}},@{Name='Pick';Expression={[int] $_.Pick}}, Owner, Player, Position, Team,
+						@{Name='Rank';Expression={[int] $_.Rank}},Time
 	} else {
 		$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
 		$olist = New-Object -TypeName System.Collections.Generic.List[PsObject]

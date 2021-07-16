@@ -122,7 +122,7 @@ Function Get-PlayerCards () {
 		$data = $($global:dataset | Where-Object -Property Owner -eq $filter)
 	} elseif ($filter -in $rlist) {
 		$data = $( $global:dataset | Where-Object {(($_.Round -eq $($hash[$filter])) -and ($_.Selected -eq $true))} | 
-				Sort-Object -Property Pick)
+				Sort-Object -Property Overall)
 	} elseif ($filter -in $plist ) {
 		$data = $($global:dataset | Where-Object -Property Position -eq $($hash[$filter]))
 	} elseif ($filter -eq "Available Players") {
@@ -365,11 +365,11 @@ Function Load-LiveDraft () {
 			$rank = $_.Rank
 			$name = $_.Name
 			$team = $_.Team
-			$selected = $_.Selected
-			$overall = $_.Overall
-			$round = $_.Round
-			$pick = $_.Pick
-			$owner = $_.Owner
+			$selected = [bool] $_.Selected
+			$overall = [int] $_.Overall
+			$round = [int] $_.Round
+			$pick = [int] $_.Pick
+			$owner = $_.Owner.trim()
 			$global:dataset | Where-Object {( ($_.Rank -eq $rank) -and ($_.Name -eq $name) -and ($_.Team -eq $team) )} | 
 				ForEach-Object -Process {
 					$_.Selected = $selected
@@ -379,7 +379,7 @@ Function Load-LiveDraft () {
 					$_.Owner = $owner
 				}
 		}
-		$global:owners | Where-OBject -Property Time -eq '' | Sort-Object -Property Overall | Select-Object -First 1
+		# $global:owners | Where-OBject -Property Time -eq '' | Sort-Object -Property Overall | Select-Object -First 1
 	}
 
 }
@@ -598,7 +598,7 @@ Function Get-DraftOrder () {
 	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
 	if ( Test-Path $draftorder ) {
 		$global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression={[int] $_.Overall}},
-						@{Name='Round';Expression={[int] $_.Round}},@{Name='Pick';Expression={[int] $_.Pick}}, Owner, Player, Position, Team,
+						@{Name='Round';Expression={[int] $_.Round}},@{Name='Pick';Expression={[int] $_.Pick}}, Owner, Player, Position, Team, 
 						@{Name='Rank';Expression={[int] $_.Rank}},Time
 	} else {
 		$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
@@ -696,7 +696,7 @@ Function Draft-Player () {
 		$global:owners | Where-Object {$_.Overall -eq $($currentpick)} | ForEach-Object -Process {
 			$round	= $_.Round
 			$pick	= $_.Pick
-			$owner	= $_.Owner
+			$owner	= $_.Owner.trim()
 			$_.Player	= $name
 			$_.Position = $pos
 			$_.Team	= $team

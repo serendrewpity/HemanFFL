@@ -168,7 +168,8 @@ Function Create-Owner () {
 	$box.add_Click({ Select-Card -border $this.parent.parent.parent })
 	$box.TextAlign = "TopLeft"
 	$box.BorderStyle="FixedSingle"
-	$box.add_TextChanged({ if ($this.Text.Length -gt 12) { $this.Font = $MsansXsmallBold } else { $this.Font = $MsansSmallBold } })
+	# $box.add_TextChanged({ if ($this.Text.Length -gt 12) { $this.Font = $MsansXsmallBold } else { $this.Font = $MsansSmallBold } })
+	$box.add_Paint({ if ($this.Text.Length -gt 12) { $this.Font = $MsansXsmallBold } else { $this.Font = $MsansSmallBold } })
 
 	$hdr=Create-Label -height 16 -width 105 -top 26 -left 0 -name "Owner" -text "Owner"
 	$hdr.Padding=New-Object System.Windows.Forms.Padding(2, 0, 0, 3)

@@ -595,6 +595,8 @@ Function Toggle-PositionFilters () {
 	$element = $null
 }
 Function Get-DraftOrder () {
+	$datafolder = (Join-Path $PSScriptRoot ..\data)
+	if ( -Not (Test-Path $datafolder) ) { New-Item -Path $datafolder -ItemType "directory" }
 	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
 	if ( Test-Path $draftorder ) {
 		$global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression={[int] $_.Overall}},

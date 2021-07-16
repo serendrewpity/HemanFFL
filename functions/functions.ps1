@@ -415,11 +415,11 @@ Function Load-Data () {
 			Team		= $tm
 			Abbr		= $_.Team
 			Selected	= $false
-			Overall		= ""
-			Round		= ""
-			Pick		= ""
-			Owner		= ""
-			Card		= ""
+			Overall	= ''
+			Round		= ''
+			Pick		= ''
+			Owner		= ''
+			Card		= ''
 		}
 		$curatedobj = New-Object -TypeName PSObject -Property $props
 		$global:dataset.Add(($curatedobj | Select-Object -Property Rank,Name,
@@ -597,7 +597,9 @@ Function Toggle-PositionFilters () {
 Function Get-DraftOrder () {
 	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
 	if ( Test-Path $draftorder ) {
-		$global:owners=Import-CSV -Delimiter "," -Path $draftorder
+		$global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression=[int]$_.Overall},
+						@{Name='Round';Expression=[int]$_.Round},@{Name='Pick';Expression=[int]$_.Pick}, Owner, Player, Position, Team,
+						@{Name='Rank';Expression=[int]$_.Rank},@{Name='Time';Expression=[datetime]$_.Time}
 	} else {
 		$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
 		$olist = New-Object -TypeName System.Collections.Generic.List[PsObject]
@@ -708,9 +710,9 @@ Function Draft-Player () {
 		$_.controls[0].controls[2].controls[3].Text = $owner
 		
 		$global:dataset | Where-Object {(($_.Name -eq $name) -and ($_.Rank -eq $rank))} | ForEach-Object -Process {
-			$_.Overall=$currentpick
-			$_.Round=$round
-			$_.Pick=$pick
+			$_.Overall=[int]$currentpick
+			$_.Round= [int]$round
+			$_.Pick=[int]$pick
 			$_.owner=$owner
 			$_.Selected = $true
 		}

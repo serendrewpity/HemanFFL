@@ -86,7 +86,7 @@ Function Get-PlayerCards () {
 
 	$plist = @("Quarterbacks", "Running Backs", "Wide Receivers","Tightends", "Place Kickers", "Defenses")
 
-	$olist=@("Drew","Massachusetts 420","Nathan","Jax","Darkside","ATLien","Stuart","Marinomania","Y.W.Snappers","Sheriff","Pete","Riverside")
+	# $olist=@("Drew","Massachusetts 420","Nathan","Jax","Darkside","ATLien","Stuart","Marinomania","Y.W.Snappers","Sheriff","Pete","Riverside")
 
 	$rlist = @("Round One", "Round Two", "Round Three", "Round Four", "Round Five", "Round Six", "Round Seven", "Round Eight", "Round Nine", 
 				"Round Ten", "Round Eleven", "Round Twelve", "Round Thirteen", "Round Fourteen", "Round Fifteen", "Round Sixteen")
@@ -118,11 +118,11 @@ Function Get-PlayerCards () {
 
 	if ($filter -in $tlist) {
 		$data = $($global:dataset | Where-Object -Property Team -eq $filter)
-	} elseif ($filter -in $olist) {
+	} elseif ($filter -in $global:olist) {
 		$data = $($global:dataset | Where-Object -Property Owner -eq $filter)
 	} elseif ($filter -in $rlist) {
 		$data = $( $global:dataset | Where-Object {(($_.Round -eq $($hash[$filter])) -and ($_.Selected -eq $true))} | 
-				Sort-Object -Property Overall)
+				Sort-Object {[int]$_.Pick})
 	} elseif ($filter -in $plist ) {
 		$data = $($global:dataset | Where-Object -Property Position -eq $($hash[$filter]))
 	} elseif ($filter -eq "Available Players") {
@@ -133,7 +133,7 @@ Function Get-PlayerCards () {
 
 	$global:currentdata = $data
 	$tlist = $null
-	$olist = $null
+	#$olist = $null
 	$rlist = $null
 	$hash = $null
 
@@ -171,13 +171,13 @@ Function Set-Drawers () {
 	$global:teams | ForEach-Object -Process { $teamnames.add($_.Team) }
 	$plist = "$(@("All Players", "Available Players", "Quarterbacks", "Running Backs", "Wide Receivers",
 			"Tightends", "Place Kickers", "Defenses") -join ","),$($teamnames -join ",")" -split ","
-	$olist=@("Drew","Massachusetts 420","Nathan","Jax","Darkside","ATLien","Stuart","Marinomania","Y.W.Snappers","Sheriff","Pete","Riverside")
+	#$olist=@("Drew","Massachusetts 420","Nathan","Jax","Darkside","ATLien","Stuart","Marinomania","Y.W.Snappers","Sheriff","Pete","Riverside")
 	$rlist = @("Round One", "Round Two", "Round Three", "Round Four", "Round Five", "Round Six"
 			"Round Seven", "Round Eight", "Round Nine", "Round Ten", "Round Eleven", "Round Twelve",
 			"Round Thirteen", "Round Fourteen", "Round Fifteen", "Round Sixteen")
 
-	if ($parent.text -eq "Players") {$list=$plist} elseif ($parent.text -eq "Owners") {$list=$olist} else {$list=$rlist}
-	1..$list.Length | ForEach-Object -Process {
+	if ($parent.text -eq "Players") {$list=$plist} elseif ($parent.text -eq "Owners") {$list=$global:olist} else {$list=$rlist}
+	1..$list.Count | ForEach-Object -Process {
 		$border=Create-Label -height 27 -width 183 -top 0 -left 0 -name ("Item_"+[string]$_) -text $($list[($_-1)])
 		$border.BorderStyle = "Fixed3D"
 		$container=Create-Label -height 27 -width 183 -top 0 -left 0 -name ("$($list[($_-1)])") -text $($list[($_-1)])
@@ -200,16 +200,17 @@ Function Set-Drawers () {
 			$togglebx = $null
 			$right = $null
 			$form = $null
-		})
+		})		
 		$border.controls.add($container)
 		$sclr.controls.add($border)
 	}
+	
 
 	$parent.controls.add($sclr)
 	$sclr = $null
 	$teamnames = $null
 	$plist = $null
-	$olist = $null
+	# $olist = $null
 	$rlist = $null
 	$parent = $null
 }
@@ -595,18 +596,27 @@ Function Toggle-PositionFilters () {
 	$element = $null
 }
 Function Get-DraftOrder () {
+	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
+
+	$global:owners = New-Object -TypeName System.Collections.Generic.List[PsObject]
+	$global:olist = New-Object -TypeName System.Collections.Generic.List[PsObject]
+
 	$datafolder = (Join-Path $PSScriptRoot ..\data)
 	if ( -Not (Test-Path $datafolder) ) { New-Item -Path $datafolder -ItemType "directory" | Out-Null }
-	$draftorder = (Join-Path $PSScriptRoot ..\data\draftboard.csv)
+
 	if ( Test-Path $draftorder ) {
-		$global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression={[int] $_.Overall}},
-						@{Name='Round';Expression={[int] $_.Round}},@{Name='Pick';Expression={[int] $_.Pick}}, Owner, Player, Position, Team, 
-						@{Name='Rank';Expression={[int] $_.Rank}},Time
+		$obj=Import-CSV -Delimiter "," -Path (Join-Path $PSScriptRoot ..\data\owners.csv)
+		$obj | ForEach-Object -Process { $global:olist.Add($_.Name) }
+		
+		$global:owners = Import-CSV -Delimiter "," -Path $draftorder
+
+		
+		# $global:owners = Import-CSV -Delimiter "," -Path $draftorder | Select-Object -Property @{Name='Overall';Expression={[int] $_.Overall}},
+						# @{Name='Round';Expression={[int] $_.Round}},@{Name='Pick';Expression={[int] $_.Pick}}, Owner, Player, Position, Team, 
+						# @{Name='Rank';Expression={[int] $_.Rank}},Time
 	} else {
-		$global:owners=New-Object -TypeName System.Collections.Generic.List[PsObject]
-		$olist = New-Object -TypeName System.Collections.Generic.List[PsObject]
 		$obj=Import-CSV -Delimiter "," -Path  (Get-Owners)
-		$obj | ForEach-Object -Process { $olist.Add($_.Name) }
+		$obj | ForEach-Object -Process { $global:olist.Add($_.Name) }
 		# $olist=@("Drew","Massachusetts 420","Nathan","Jax","Darkside","ATLien",
 		#	"Stuart","Marinomania","Y.W.Snappers","Sheriff","Pete","Riverside")
 
@@ -614,12 +624,12 @@ Function Get-DraftOrder () {
 		1..16 | ForEach-Object -Process {
 			$idx = $_
 			if (($_ % 2) -eq 0) {
-				($olist.Count-1)..0 | ForEach-Object {
+				($global:olist.Count-1)..0 | ForEach-Object {
 					$props=[ordered]@{
 						Overall = [int] $icnt
 						Pick = [int] 12-$_
 						Round = [int] $idx
-						Owner = $olist[$_]
+						Owner = $global:olist[$_]
 						Player = ''
 						Position = ''
 						Team = ''
@@ -631,12 +641,12 @@ Function Get-DraftOrder () {
 					$icnt += 1
 				}
 			} else {
-				0..($olist.Count-1) | ForEach-Object {
+				0..($global:olist.Count-1) | ForEach-Object {
 					$props=[ordered]@{
 						Overall = [int] $icnt
 						Pick = [int] $_+1
 						Round = [int] $idx
-						Owner = $olist[$_]
+						Owner = $global:olist[$_]
 						Player = ''
 						Position = ''
 						Team = ''
@@ -650,7 +660,7 @@ Function Get-DraftOrder () {
 			}
 		}
 	}
-	$olist = $null
+	# $olist = $null
 }
 Function Get-NextPicks () {
 	[CmdletBinding()]

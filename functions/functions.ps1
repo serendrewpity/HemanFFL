@@ -119,7 +119,7 @@ Function Get-PlayerCards () {
 	if ($filter -in $tlist) {
 		$data = $($global:dataset | Where-Object -Property Team -eq $filter)
 	} elseif ($filter -in $global:olist) {
-		$data = $($global:dataset | Where-Object -Property Owner -eq $filter)
+		$data = $($global:dataset | Where-Object -Property Owner -eq $filter | Sort-Object {[int]$_.Round} )
 	} elseif ($filter -in $rlist) {
 		$data = $( $global:dataset | Where-Object {(($_.Round -eq $($hash[$filter])) -and ($_.Selected -eq $true))} | 
 				Sort-Object {[int]$_.Pick})
@@ -288,6 +288,8 @@ Function Create-Handle () {
 				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[$round].controls[0]
 				Update-Players -panel $form.controls[1] -filter $this.parent.parent.controls[$idx].controls[0].controls[$round].controls[0].Text
 			}
+			# Show-Error -Title "Hello World" -Text $this.parent.parent.parent.parent.controls[1].controls[1].Name
+			Update-PositionCounts -element $this.parent.parent.parent.parent.controls[1].controls[1]
 			$this.parent.BackColor = [System.Drawing.Color]::FromARGB(0,120,215)
 		} else {
 			$this.Top=0
@@ -539,6 +541,7 @@ Function Update-PositionCounts () {
 		param (	[object] $element )
 
 	$buttonface=[System.Drawing.Color]::FromName("Buttonface")
+	$element.controls | ForEach-Object { $_.controls[0].text = 0 }
 
 	$right = $element.parent
 	$tglecol = $element

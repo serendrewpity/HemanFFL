@@ -280,11 +280,17 @@ Function Create-Handle () {
 				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[1].controls[0]
 				Update-Players -panel $form.controls[1] -filter "Available Players"
 			} elseif ($this.Text -eq "Owners") { 
-				$pick=[int] ($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Pick - 1
+				$draftover=$global:owners | Where-Object -Property Time -eq ''
+				if ($draftover -eq $null) { $pick=0 } else {			
+					$pick=[int] ($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Pick - 1
+				}
 				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[$pick].controls[0]
 				Update-Players -panel $form.controls[1] -filter $this.parent.parent.controls[$idx].controls[0].controls[$pick].controls[0].Text
 			} else { 
-				$round=($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Round - 1
+				$draftover=$global:owners | Where-Object -Property Time -eq ''
+				if ($draftover -eq $null) { $round=0 } else {
+					$round=($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Round - 1
+				}
 				Select-MenuItem -menuitem $this.parent.parent.controls[$idx].controls[0].controls[$round].controls[0]
 				Update-Players -panel $form.controls[1] -filter $this.parent.parent.controls[$idx].controls[0].controls[$round].controls[0].Text
 			}
@@ -321,29 +327,31 @@ Function Create-Handle () {
 function Get-ADPRanking () {
 
 	$ADPRankingCSV = (Join-Path $PSScriptRoot ..\data\adprankings.csv)
-	$proto="https:"
-	$fqdn="docs.google.com"
-	$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
-	$sheet="0"
-	$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
 
 	if ( -not (Test-Path $ADPRankingCSV) ) {
+		$proto="https:"
+		$fqdn="docs.google.com"
+		$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
+		$sheet="0"
+		$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
 		Invoke-WebRequest -Uri "$proto//$fqdn/$path" -Outfile $ADPRankingCSV
 	}
+	
 	return $ADPRankingCSV
 }
 Function Get-Teams () {
 
 	$teams = (Join-Path $PSScriptRoot ..\data\teams.csv)
-	$proto="https:"
-	$fqdn="docs.google.com"
-	$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
-	$sheet="1459467330"
-	$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
 	
 	if ( -not (Test-Path $teams) ) {
+		$proto="https:"
+		$fqdn="docs.google.com"
+		$workbook="2PACX-1vQjEJNN8xBJny-dYz9Et3a1pqXe_is3zptyE6lhRZQBPproZphEgZ5Jb9SfOyO3QRdBHBgpdeN4IRfa"
+		$sheet="1459467330"
+		$path="spreadsheets/d/e/${workbook}/pub?gid=${sheet}&single=true&output=csv"
 		Invoke-WebRequest -Uri "$proto//$fqdn/$path" -Outfile $teams
 	}
+	
 	return $teams
 }
 Function Get-Owners () {
@@ -364,6 +372,7 @@ Function Load-LiveDraft () {
 	$draft = (Join-Path $PSScriptRoot ..\data\selections.csv)
 	if ( Test-Path $draft ) {
 		$livedraftcsv=Import-CSV -Delimiter "," -Path $draft
+		$draftover=$livedraftcsv | Where-Object -Property Selected -eq $True
 		$livedraftcsv | Where-Object -Property Selected -eq $True | ForEach-Object -Process {
 			$rank = $_.Rank
 			$name = $_.Name
@@ -441,6 +450,10 @@ Function Select-Card () {
 
 	$drftbtn=$border.parent.parent.parent.controls.Find("DraftBtn",$true)[0]
 	$plyrdrft=$border.controls.Find("Drafted-Undrafted",$true)[0]
+	$plyr = $border.controls.Find("pname",$true)[0].Text
+	$pos = $border.controls.Find("ppos",$true)[0].Text
+	$tm = $border.controls.Find("pteam",$true)[0].Text
+	Set-Clipboard -Value "$plyr $pos, $tm"
 	if ($border.parent.parent.parent.controls.Find("Players",$true)[0].parent.BackColor -ne $buttonface) {
 		if ($plyrdrft.Text -eq "Drafted") {
 			$drftbtn.enabled=$false
@@ -668,9 +681,16 @@ Function Get-DraftOrder () {
 Function Get-NextPicks () {
 	[CmdletBinding()]
 		param (	[object] $clock, [object] $deck )
-
-	$onclock=($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Owner
-	$ondeck=(($global:owners | Where-Object -Property Time -eq '' | Sort-Object { [int] $_.Overall }  | Select-Object -First 2) | Select-Object -Skip 1).Owner
+		
+	$draftover=$global:owners | Where-Object -Property Time -eq ''
+	if ($draftover -eq $null) { 
+		$onclock=''
+		$ondeck=''
+	}
+	else {
+		$onclock=($draftover | Sort-Object { [int] $_.Overall } | Select-Object -First 1).Owner
+		$ondeck=(($draftover | Sort-Object { [int] $_.Overall }  | Select-Object -First 2) | Select-Object -Skip 1).Owner
+	}
 
 	$lbl = Create-Label -height 30 -width 197 -top 18 -left 0 -name "ClockTxt" -text $onclock
 	$lbl.Padding = New-Object System.Windows.Forms.Padding(25,0,0,0)
@@ -689,8 +709,11 @@ Function Get-NextPicks () {
 	$deck = $null
 }
 Function Get-CurrentPickNo () {
-	$global:owners | Where-Object -Property Time -eq '' | Sort-Object -Property Overall | 
-		Select-Object -Property Overall -First 1 | ForEach-Object -Process { return $_.Overall }
+	
+	$np=($global:owners | Where-Object -Property Time -eq '' | Sort-Object {[int]$_.Overall} | 
+		Select-Object -Property Overall -First 1).Overall
+	if ($np -ne $null) { return $np } else { return 1 }
+	
 }
 Function Draft-Player () {
 	[CmdletBinding()]
@@ -706,6 +729,7 @@ Function Draft-Player () {
 		$rank = $_.controls[0].controls[0].controls[1].Text
 		$pos  = $_.controls[0].controls[1].controls[1].Text.Replace("(","").Replace(")","")
 		$team = $_.controls[0].controls[1].controls[2].Text
+		Set-Clipboard -Value $name, $pos, $team
 		$currentpick=(Get-CurrentPickNo)
 
 		$global:owners | Where-Object {$_.Overall -eq $($currentpick)} | ForEach-Object -Process {
@@ -719,21 +743,32 @@ Function Draft-Player () {
 			$_.Time	= $(Get-Date -Format o).Replace(":",".")
 		}
 
+
 		$_.controls[0].controls[2].controls[0].Text = $currentpick
 		$_.controls[0].controls[2].controls[1].Text = $round
 		$_.controls[0].controls[2].controls[2].Text = $pick
 		$_.controls[0].controls[2].controls[3].Text = $owner
-		
+				
 		$global:dataset | Where-Object {(($_.Name -eq $name) -and ($_.Rank -eq $rank))} | ForEach-Object -Process {
 			$_.Overall=[int]$currentpick
 			$_.Round= [int]$round
 			$_.Pick=[int]$pick
-			$_.owner=$owner
+			$_.Owner=$owner
 			$_.Selected = $true
 		}
-		$global:onclock.controls[0].Text = ($global:owners | Where-Object {$_.Overall -eq $($currentpick+1)}).Owner
-		$global:ondeck.controls[0].Text  = ($global:owners | Where-Object {$_.Overall -eq $($currentpick+2)}).Owner
+		
 
+		# Show-Error -Title "Hello World" -Text $currentpick
+		# $global:owners | Where-Object {$_.Overall -eq $([int]$currentpick + 1)} | Out-GridView 
+		$global:onclock.controls[0].Text = ''
+		$global:ondeck.controls[0].Text  = ''
+		if ( $currentpick -le 190 ) {
+			$global:onclock.controls[0].Text = ($global:owners | Where-Object {$_.Overall -eq $([int]$currentpick+1)}).Owner
+			$global:ondeck.controls[0].Text  = ($global:owners | Where-Object {$_.Overall -eq $([int]$currentpick+2)}).Owner
+		} elseif ($currentpick -eq 191) {
+			$global:onclock.controls[0].Text = ($global:owners | Where-Object {$_.Overall -eq $([int]$currentpick+1)}).Owner
+		}
+		
 		$_.controls[0].controls[2].controls[4].Text = "Drafted"
 
 		$Available=$scroller.parent.parent.controls.Find("Available Players",$true)[0]
